@@ -1,0 +1,11 @@
+{
+  "name": "مخزون HorsesWear",
+  "short_name": "HorsesWear",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f6f1ea",
+  "theme_color": "#5b3a29",
+  "icons": []
+}

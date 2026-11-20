@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#5b3a29">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>مخزون HorsesWear</title>
+<style>
+:root{--brand:#5b3a29;--brand2:#8a5a3c;--bg:#f6f1ea;--card:#fff;--ink:#2b2018;--mut:#7a6a5d;--ok:#2e7d32;--bad:#c62828;--warn:#ef6c00;--line:#e5dccf}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:Tahoma,Arial,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:78px}
+header{position:sticky;top:0;z-index:5;background:var(--brand);color:#fff;padding:14px 16px;font-size:18px;font-weight:bold;display:flex;justify-content:space-between;align-items:center}
+main{padding:14px;max-width:720px;margin:auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.kpi b{display:block;font-size:24px;color:var(--brand)}
+.kpi span{font-size:13px;color:var(--mut)}
+label{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
+input,select,textarea{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:16px;font-family:inherit;background:#fff}
+button{border:0;border-radius:10px;padding:13px 16px;font-size:16px;font-family:inherit;background:var(--brand);color:#fff;width:100%;margin-top:12px}
+button.sec{background:#efe6da;color:var(--brand)}
+button.sm{width:auto;padding:8px 12px;font-size:14px;margin:0}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:right}
+th{color:var(--mut);font-weight:normal;font-size:12px}
+.low{color:var(--bad);font-weight:bold}
+.tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:12px;background:#efe6da}
+nav{position:fixed;bottom:0;right:0;left:0;background:#fff;border-top:1px solid var(--line);display:flex;overflow-x:auto;padding-bottom:env(safe-area-inset-bottom)}
+nav a{flex:1;min-width:72px;text-align:center;padding:10px 4px;font-size:12px;color:var(--mut);text-decoration:none}
+nav a.on{color:var(--brand);font-weight:bold;border-top:3px solid var(--brand)}
+nav a i{display:block;font-style:normal;font-size:20px}
+.hide{display:none}
+#toast{position:fixed;bottom:90px;right:50%;transform:translateX(50%);background:#222;color:#fff;padding:10px 18px;border-radius:30px;font-size:14px;opacity:0;transition:.3s;pointer-events:none}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<header><span>🐎 مخزون HorsesWear</span><span id="who" style="font-size:12px"></span></header>
+<main id="app"></main>
+<nav id="nav"></nav>
+<div id="toast"></div>
+<script>
+const KEY='hw_inventory_v1';
+const $=s=>document.querySelector(s);
+let DB;try{DB=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){DB=null}
+DB=DB||{items:[],customers:[],moves:[],counts:[]};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(DB))}catch(e){}};
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const today=()=>new Date().toISOString().slice(0,10);
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2200)}
+const TYPES={buy:'شراء',sale:'بيع',ret_in:'مرتجع من عميل',ret_out:'مرتجع لمورد',adj:'تسوية جرد'};
+const SIGN={buy:1,sale:-1,ret_in:1,ret_out:-1,adj:1};
+function stock(id){return DB.moves.filter(m=>m.item===id).reduce((s,m)=>s+SIGN[m.type]*m.qty,0)}
+function itemName(i){return i.name+' / '+i.color+' / '+i.size}
+function addMove(type,item,qty,extra={}){
+  if(!item||!qty||isNaN(qty)){toast('اكمل البيانات');return false}
+  qty=Number(qty);
+  if((type==='sale'||type==='ret_out')&&qty>stock(item)){toast('الكمية أكبر من الرصيد');return false}
+  DB.moves.push(Object.assign({id:uid(),date:today(),type,item,qty},extra));
+  save();return true;
+}
+function addItem(name,color,size,price,min){
+  if(!name||!color||!size){toast('اكتب المنتج واللون والمقاس');return}
+  if(DB.items.some(i=>i.name===name&&i.color===color&&i.size===size)){toast('الصنف موجود قبل كده');return}
+  DB.items.push({id:uid(),name,color,size,price:Number(price)||0,min:Number(min)||0});save();toast('تم حفظ الصنف');
+}
+function addCustomer(name,phone){
+  if(!name){toast('اكتب الاسم');return}
+  DB.customers.push({id:uid(),name,phone});save();toast('تم حفظ العميل');
+}
+function approveCount(itemId,counted){
+  const diff=Number(counted)-stock(itemId);
+  if(diff===0){toast('مفيش فرق');return}
+  DB.moves.push({id:uid(),date:today(),type:'adj',item:itemId,qty:diff,note:'تسوية جرد'});
+  DB.counts.push({id:uid(),date:today(),item:itemId,counted:Number(counted),diff});
+  save();toast('تم اعتماد التسوية');
+}
+function exportBackup(){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(DB)],{type:'application/json'}));
+  a.download='horseswear-backup-'+today()+'.json';a.click();
+}
+function importBackup(file){
+  const r=new FileReader();
+  r.onload=()=>{try{DB=JSON.parse(r.result);save();go(cur);toast('تم الاسترجاع')}catch(e){toast('الملف غير صالح')}};
+  r.readAsText(file);
+}
+let cur='dash';
+const TABS=[['dash','📊','الرئيسية'],['sale','🛒','بيع'],['buy','📦','شراء'],['ret','↩️','مرتجع'],['items','🏷️','الأصناف'],['cust','👥','العملاء'],['count','📋','جرد'],['log','🧾','الحركات']];
+function opts(){return DB.items.map(i=>`<option value="${i.id}">${itemName(i)} (رصيد ${stock(i.id)})</option>`).join('')}
+function custOpts(){return '<option value="">بدون عميل</option>'+DB.customers.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}
+const V={
+ dash(){
+  const total=DB.items.reduce((s,i)=>s+stock(i.id),0);
+  const val=DB.items.reduce((s,i)=>s+stock(i.id)*i.price,0);
+  const low=DB.items.filter(i=>stock(i.id)<=i.min);
+  const sales=DB.moves.filter(m=>m.type==='sale'&&m.date.slice(0,7)===today().slice(0,7)).reduce((s,m)=>s+m.qty*m.price,0);
+  return `<div class="grid"><div class="card kpi"><b>${DB.items.length}</b><span>عدد الأصناف</span></div><div class="card kpi"><b>${total}</b><span>إجمالي القطع</span></div><div class="card kpi"><b>${val}</b><span>قيمة المخزون</span></div><div class="card kpi"><b>${sales}</b><span>مبيعات الشهر</span></div></div>
+  <div class="card"><b>أصناف قاربت على النفاد</b><table>${low.map(i=>`<tr><td>${itemName(i)}</td><td class="low">${stock(i.id)}</td></tr>`).join('')||'<tr><td>مفيش أصناف ناقصة</td></tr>'}</table></div>
+  <div class="card"><button class="sec" onclick="exportBackup()">حفظ نسخة احتياطية</button><label>استرجاع نسخة</label><input type="file" accept=".json" onchange="importBackup(this.files[0])"></div>`},
+ sale(){return `<div class="card"><label>الصنف</label><select id="f_item">${opts()}</select><label>العميل</label><select id="f_cust">${custOpts()}</select><label>الكمية</label><input id="f_qty" type="number" inputmode="numeric" min="1"><label>سعر البيع للقطعة</label><input id="f_price" type="number" inputmode="decimal"><button onclick="if(addMove('sale',$('#f_item').value,$('#f_qty').value,{price:Number($('#f_price').value)||0,cust:$('#f_cust').value})){toast('تم البيع');go('sale')}">تسجيل البيع</button></div>`},
+ buy(){return `<div class="card"><label>الصنف</label><select id="f_item">${opts()}</select><label>المورد</label><input id="f_sup"><label>الكمية</label><input id="f_qty" type="number" inputmode="numeric" min="1"><label>سعر الشراء للقطعة</label><input id="f_price" type="number" inputmode="decimal"><button onclick="if(addMove('buy',$('#f_item').value,$('#f_qty').value,{price:Number($('#f_price').value)||0,sup:$('#f_sup').value})){toast('تم الشراء');go('buy')}">تسجيل الشراء</button></div>`},
+ ret(){return `<div class="card"><label>النوع</label><select id="f_type"><option value="ret_in">مرتجع من عميل</option><option value="ret_out">مرتجع لمورد</option></select><label>الصنف</label><select id="f_item">${opts()}</select><label>الكمية</label><input id="f_qty" type="number" inputmode="numeric" min="1"><label>السبب</label><input id="f_note"><button onclick="if(addMove($('#f_type').value,$('#f_item').value,$('#f_qty').value,{note:$('#f_note').value})){toast('تم التسجيل');go('ret')}">تسجيل المرتجع</button></div>`},
+ items(){return `<div class="card"><b>صنف جديد</b><label>المنتج</label><input id="n_name"><label>اللون</label><input id="n_color"><label>المقاس</label><input id="n_size"><label>سعر البيع</label><input id="n_price" type="number" inputmode="decimal"><label>حد إعادة الطلب</label><input id="n_min" type="number" inputmode="numeric"><button onclick="addItem($('#n_name').value.trim(),$('#n_color').value.trim(),$('#n_size').value.trim(),$('#n_price').value,$('#n_min').value);go('items')">حفظ الصنف</button></div><div class="card"><table><tr><th>الصنف</th><th>الرصيد</th></tr>${DB.items.map(i=>`<tr><td>${itemName(i)}</td><td class="${stock(i.id)<=i.min?'low':''}">${stock(i.id)}</td></tr>`).join('')}</table></div>`},
+ cust(){return `<div class="card"><label>اسم العميل</label><input id="c_name"><label>الموبايل</label><input id="c_phone" type="tel"><button onclick="addCustomer($('#c_name').value.trim(),$('#c_phone').value);go('cust')">حفظ العميل</button></div><div class="card"><table>${DB.customers.map(c=>`<tr><td>${c.name}</td><td>${c.phone||''}</td></tr>`).join('')}</table></div>`},
+ count(){return `<div class="card"><label>الصنف</label><select id="f_item">${opts()}</select><label>الكمية الفعلية على الرف</label><input id="f_cnt" type="number" inputmode="numeric"><button onclick="if($('#f_item').value){approveCount($('#f_item').value,$('#f_cnt').value);go('count')}">اعتماد الجرد وتسوية الفرق</button></div><div class="card"><table><tr><th>التاريخ</th><th>الصنف</th><th>الفرق</th></tr>${DB.counts.slice().reverse().map(c=>{const i=DB.items.find(x=>x.id===c.item);return `<tr><td>${c.date}</td><td>${i?itemName(i):''}</td><td>${c.diff}</td></tr>`}).join('')}</table></div>`},
+ log(){return `<div class="card"><table><tr><th>التاريخ</th><th>النوع</th><th>الصنف</th><th>الكمية</th></tr>${DB.moves.slice().reverse().map(m=>{const i=DB.items.find(x=>x.id===m.item);return `<tr><td>${m.date}</td><td><span class="tag">${TYPES[m.type]}</span></td><td>${i?itemName(i):''}</td><td>${m.qty}</td></tr>`}).join('')||'<tr><td>مفيش حركات لسه</td></tr>'}</table></div>`}
+};
+function go(t){cur=t;$('#app').innerHTML=V[t]();$('#nav').innerHTML=TABS.map(x=>`<a href="#" class="${x[0]===t?'on':''}" onclick="go('${x[0]}');return false"><i>${x[1]}</i>${x[2]}</a>`).join('');window.scrollTo(0,0)}
+go('dash');
+</script>
+</body>
+</html>
